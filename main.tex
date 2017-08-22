@@ -1,0 +1,1016 @@
+\documentclass[12pt,a4paper]{report} %Defines report with default font size of 12pt & A4 paper size
+\usepackage{lmodern,hyperref, graphicx,lipsum,standalone,listings,parskip,siunitx,courier}  %Includes packages for fonts,links,images
+  \hypersetup{
+    pdfborder     = 0 0 0,
+    bookmarksopen = true,
+    bookmarksdepth= 1,% to show sections and subsections
+    pdfauthor     = {Brian Colgan},
+    pdftitle      = {Wave Analysis using FPGAs on Marine Buoys},
+    pdfsubject    = {Final Year Project Report of Brian Colgan},
+    pdfkeywords   = {C12380846, FYP, DT081},
+    pdfproducer={LaTeX with hyperref},
+    pdfcreator={pdfLaTeX}
+    }
+\usepackage[top=2.5cm, bottom=2.5cm, left=3cm, right=3cm]{geometry} %Sets margins
+\usepackage[toc]{appendix} %Includes Appendix package and adds it to TOC
+\usepackage[utf8]{inputenc} %Allows accents to be input
+\usepackage[T1]{fontenc} %Allows accents to be copied correctly
+\usepackage{tikz}
+%\usepackage[parfill]{parskip}
+\usetikzlibrary{shapes,arrows}
+\hypersetup{colorlinks, linktoc=all, urlcolor=black, linkcolor=black, citecolor=black} %Sets link colours
+\linespread{1.25} % Equivalent to 1.5 line-spacing in Word
+\bibliographystyle{IEEEtran} %Sets IEEE referencing style
+\lstset{basicstyle=\footnotesize\ttfamily,breaklines=true}
+\renewcommand{\contentsname}{Table of Contents}
+\renewcommand{\bibname}{References} %Renames Bibliography to References
+\begin{document}
+%-----------------------------------------------------------------
+%	TITLE PAGE
+%-----------------------------------------------------------------
+\begin{titlepage}
+	\centering
+	\includegraphics[height=5cm]{images/dit}\\
+    \vspace{2cm}
+	{\Large Wave Analysis using FPGAs on Marine Buoys\par}
+	\vspace{2cm}
+    {by \par}
+	\vspace{2cm}
+	{Brian \textsc{Colgan}\par}
+    \vspace{4cm}
+    {This Report is submitted in partial fulfilment of the requirements of the Honours Degree in Computer and Communications Engineering (DT081) of the Dublin Institute of Technology\par}
+    \vspace{1cm}
+	{May 29, 2017\par}
+    \vspace{1cm}
+	{Academic Supervisor: Dr. Andreas \textsc{Schwarzbacher}\par}
+	{Company Supervisor: Mr. Paul \textsc{Drum}\par}
+	\vfill
+\end{titlepage}
+%-----------------------------------------------------------------
+%	DECLARATION
+%-----------------------------------------------------------------
+\chapter*{Declaration}
+\pagenumbering{roman}
+I, the undersigned, declare that this report is entirely my own written work, except where otherwise accredited, and that it has not been submitted for a degree or other award to any other university or institution.\par\vspace{\baselineskip}
+\noindent Signed:\\
+\makebox[0pt][l]{\hspace*{2cm}\raisebox{-3.5ex}{\includegraphics[scale=0.5]{images/sig}}}
+\rule{25em}{0.5pt}\\
+\noindent Date:\\
+\makebox[0pt][l]{\hspace*{2cm}\raisebox{0.6ex}{May 29, 2017}}
+\rule{25em}{0.5pt}
+%-----------------------------------------------------------------
+%	ACKNOWLEDGEMENTS
+%-----------------------------------------------------------------
+\chapter*{Acknowledgements}
+I would firstly like to thank everyone at CréVinn Teoranta for the opportunity to work with them.
+In particular I would like to thank principal engineer Mr. Paul Drum for his support throughout this project.
+I would also like to thank Dr. Andreas Schwarzbacher for his help and direction with this project.
+
+%-----------------------------------------------------------------
+%	ABSTRACT
+%-----------------------------------------------------------------
+\chapter*{Abstract}
+In this project an embedded system is developed to analyse wave data.
+The system developed uses acceleration measurements and performs a Fast Fourier Transform (FFT) on these measurements.
+A Nexys4-DDR development board will be used throughout the project.
+The board uses the Artix-7 Field Programmable Gate Array (FPGA) from Xilinx.
+This is the target device to implement a soft Intellectual Property (IP) core.
+By using Xilinx MicroBlaze Processor the Universal Asynchronous Receiver/Transmitter (UART) Soft IP Core was designed to send the calculated results of the FFT. 
+
+%-----------------------------------------------------------------
+%	TABLE OF CONTENTS
+%-----------------------------------------------------------------
+\tableofcontents
+\listoffigures
+\begingroup
+\let\clearpage\relax
+\lstlistoflistings
+\endgroup
+%-----------------------------------------------------------------
+%	THESIS CONTENT
+%-------------------------------------------------------------
+\chapter{Introduction}
+\pagenumbering{arabic}
+The aim of this project is to design and implement a system that can mathematically process wave data and transmit this data using a Field Programmable Gate Array (FPGA).
+
+The Nexys4 DDR board will be used throughout the project. It is a complete, ready-to-use digital circuit development platform based on the latest Artix-7 FPGA from Xilinx \cite{nexys}.
+
+\section{Objectives}
+The goal of this project is to determine sea state and water temperature using an FPGA.
+Wave power in particular is a measurement which is useful information for marine users and wave power generation research. 
+An FPGA will be used for this project as it has many advantages.
+FPGAs can be programmed using both hardware description languages (HDL) and software programming languages, in this way FPGAs can offer the flexibility of software with the high performance of hardware.
+Another advantage is reprogrammability and reusability, hardware design faults can be resolved by modifying the HDL code and uploading a new bitstream to the device.
+This can all be done instantly.
+The availability of peripherals is also a huge advantage of using FPGAs.
+This FPGA development board was chosen as it has an accelerometer and thermometer, measurements from both peripherals will be used in this project.
+
+The FPGA must read in acceleration measurements using the on-board three axes accelerometer.
+This is the information used to calculate magnitude of the acceleration.
+This displacement data should be mathematically processed to analyse the wave.
+The main challenge in this project is to implement a MicroBlaze softcore processor on the FPGA which can read accelerometer measurements and to design a Fast Fourier Transform (FFT) using C on this soft-processor.
+The FFT results can be used in calculating wave energy.
+
+This information must then be formed into a human-readable message which should outline sea state, weather conditions.
+An on-board temperature sensor is also used to measure temperature of the water in degrees Celsius.
+This information should be appended to the message which will be transmitted to the end-user.
+
+\section{Ethics}
+The information obtained in this project is particularly useful for two groups within society; marine users and wave power researchers.
+As such, the ethical requirements of this project can be divided into two parts;
+\begin{itemize}
+\item Relations with colleagues, clients, employers and society in general
+\item Environmental and social obligations
+\end{itemize}
+both of which are set out by Engineers Ireland in its Code of Ethics \cite{iei}.
+
+With regards to societal relations, the intention of the project is to provide safety information to marine users.
+In this context, the project is a demonstration of skills and expertise being applied to the common good as well as advancing human welfare with proper regard for the health and welfare of the public.
+It is important to note that this project is designed to be non-hazardous and have no military applications so as to not result in a serious detriment to any person or persons.
+
+Environmental and social obligations are also a primary motive for this project.
+As outlined above wave power researchers would, understandably, have significant interest in wave energy estimations.
+The design of this project is intended to promote the principles and practises of sustainable development and the needs of the present and future generations.
+The project shall also foster environmental awareness within the profession of engineering among the public.
+
+The reason an Artix-7 FPGA was selected was due to it being the highest performance-per-watt fabric offered by Xilinx \cite{xilinx}.
+This allows the design to accomplish the objectives outlined in the Introduction with the most efficient consumption of natural resources which is practicable economically.
+This includes the maximum reduction in energy usage, waste and pollution.
+
+As this FPGA has low power consumption it would also be possible to power the design itself with a renewable energy source e.g. wave energy. Execution of the project in this way eliminates any adverse impact on the natural environment.
+
+\section{Project Organisation}
+Time management is vital within a project, as such the project is broken down into phases and then again into tasks.
+Each task is allotted a predicted amount of time and this allows schedules and deadlines to be made.
+Each phase and its corresponding tasks are input to a Microsoft Project file.
+This predicted timeline is displayed as a Gantt chart which allows for accurate tracking of tasks and resources.
+\subsection{Resources}
+Resources for this project were provided by the company sponsoring the project, CréVinn Teoranta \cite{crevinn}, these include materials such as the FPGA as well as a computer to work on throughout the project.
+\subsection{Milestones}
+Milestones are the major goals within a project, these are outlined below;
+\begin{itemize}
+\item Design specification
+\item Register-Transfer Level (RTL) Design
+\item RTL Verification
+\item Design on FPGA
+\end{itemize}
+\subsection{Plan}
+The Gantt chart for the project can be seen in Figure 1.1.
+\begin{figure}[ht]
+\centerline{\includegraphics[angle=90,scale=0.6]{diagrams/gantt}}
+\caption{Gantt Chart}
+\end{figure}
+\chapter{Technical Background}
+In this chapter, the different technologies utilised throughout the project are outlined.
+These include the different languages, protocols and IDEs used.
+They will be described in a general way which does not include how they will be used in the project.
+\section{FFT}
+To process the data the design will perform an FFT by implementing the Cooley-Tukey algorithm, this is the most common form of FFT.
+It is a recursive algorithm which breaks the Discrete Fourier Transform (DFT) into smaller DFTs.
+This design will divide the DFT of size $n = 2m$ into two interleaved DFTs of size $m$, this is known as radix-2.
+\begin{figure}[h]
+\centerline{\includegraphics[scale=0.5]{diagrams/Butterfly-FFT}}
+\caption[Butterfly Diagram]{Butterfly Diagram \cite{butterfly}}
+\end{figure}
+
+These smaller DFTs are then combined via size-2 DFTs (known as butterflies in this context, due to the shape of the data flow) pre-multiplied by roots of unity (which are known as twiddle factors).
+The butterfly operation takes the form:
+\begin{equation} 
+y_0 = x_0 + x_1\omega^k_n
+\end{equation}
+\begin{equation} 
+y_1 = x_0 - x_1\omega^k_n
+\end{equation}
+
+The above form is known as Decimation In Time (DIT).
+However, one can have a process where the butterflies come first and are post-multiplied by the twiddle factors, which is known as Decimation In Frequency (DIF).
+\section{UART}
+A Universal Asynchronous Receiver/Transmitter (UART) is used for asynchronous serial input/output.
+Its most common protocol is RS-232.
+In this, the sender and receiver agree on a baud rate, bits per byte, parity and framing bits.
+UART is very useful for debugging and communicating with other computer systems \cite{iot}.
+\section{VHDL}
+Very High Speed Integrated Circuit Hardware Description Language (VHDL) was defined for use in the design and documentation of electronics systems \cite{vhdl}.
+VHDL allows designers to design at various levels of abstraction when considering the application of VHDL to FPGA design, it is helpful to identify register transfer level (RTL) as one of the levels of abstraction.
+RTL is the input to synthesis \cite{vhdlabs}.
+\section{Xilinx Vivado}
+The Vivado Design Suite is a software suite designed by Xilinx to increase the overall productivity for designing, integrating, and implementing systems using Xilinx devices, including the Xilinx 7 series \cite{vivado}.
+The Vivado Design Suite replaced the existing Xilinx ISE Design Suite of tools in 2013 \cite{ise}.
+\section{MicroBlaze}
+The MicroBlaze Soft Processor Core developed by Xilinx is a key element of their product portfolio \cite{microblaze}.
+MicroBlaze will implement a microprocessor entirely within the Xilinx FPGA general purpose memory and logic fabric \cite{nexysmb}.
+It is a highly configurable and easy to use processor and is included free with Xilinx Vivado.
+In terms of its instruction set architecture, it is an FPGA optimized 32-bit Reduced Instruction Set Computer (RISC) soft processor.
+Figure 2.2 shows a block diagram of the MicroBlaze core.
+\begin{figure}[h]
+\centerline{\includegraphics{diagrams/image5}}
+\caption[MicroBlaze Core Block Diagram]{MicroBlaze Core Block Diagram \cite{microblock}}
+\end{figure}
+\section{AXI}
+The MicroBlaze supports the use Advanced eXtensible Interface (AXI) peripherals. AXI is a bus protocol which falls under the Advanced Microcontroller Bus Architecture (AMBA) specification. AXI is targeted at high performance, high clock frequency system designs and it supports the following \cite{axi};
+\begin{itemize}
+\item separate address/control and data phases
+\item unaligned data transfers using byte strobes
+\item burst-based transactions with only start address issued
+\item separate read and write data channels to enable low-cost DMA
+\item ability to issue multiple outstanding addresses
+\item out-of-order transaction completion
+\item easy addition of register stages to provide timing closure
+\end{itemize}
+An illustration of how the AXI protocol is intended to be implemented is shown in Figure 2.3.
+\begin{figure}[ht]
+\centerline{\includegraphics[width=1.0\textwidth]{diagrams/image6}}
+\caption[AXI channel order and interfaces]{AXI channel order and interfaces \cite{axi}}
+\end{figure}
+\section{Xilinx SDK}
+The Xilinx Software Development Kit (SDK) is the Integrated Design Environment (IDE) for creating embedded systems on the MicroBlaze.
+It enables programmers to write, compile, and debug C (or C\texttt{++}) applications for their embedded system.
+This software can be tested by downloading the code directly to the FPGA and executing it on the actual system.
+It is included free with Xilinx Vivado and is based on Eclipse 4.5.0.
+Like any SDK, it also contains a full suite of libraries and sample code \cite{xsdk}.
+\section{C Programming Language}
+C is a general-purpose programming language that was originally designed in 1972.
+It was designed for writing system software and it was the language the UNIX operating system was written in.
+Its use has now spread way beyond that field, such as embedded systems \cite{yuri}.
+\chapter{Design Procedure}
+In this chapter, the design of the system will be discussed.
+This includes how the technologies from the previous chapter will be implemented to achieve the overall project objectives.
+\section{Development Board}
+The Nexys4 DDR board has generous external memories and several built-in peripherals, including an accelerometer.
+This allows the Nexys4 DDR to be used for a wide range of designs without needing any other components.
+
+The Nexys4 DDR is an updated version of the Nexys4 board. The major improvement is the replacement of the 16 MiB CellularRAM with a 128 MiB DDR2 SDRAM memory.
+This new RAM can be accessed at up to 1334 MB/s, this is particular useful for embedded processor-based designs which would perform poorly with slow asynchronous memory access \cite{digvid}.
+
+The board also includes an Analog Devices ADXL362 accelerometer.
+The ADXL362 is an ultralow power, 3-axis Microelectromechanical systems (MEMS) accelerometer that consumes less than \SI{2}{\micro\ampere} at a 100Hz output data rate and 270nA when in motion triggered wake-up mode.
+In addition to its ultralow power consumption, the ADXL362 has many features to enable true system level power reduction.
+It includes a built-in micropower temperature sensor.
+
+These features are what makes the board very suitable for the specified application.
+An overview of the proposed design of system can be seen in Figure 3.1:
+\begin{figure}[ht]
+\centerline{\includegraphics[scale=0.8]{diagrams/System_Overview}}
+\caption{System Overview}
+\end{figure}
+
+For this design, the Core is the MicroBlaze. The accelerometer and temperature sensor are inputs to the system and calculations will be output to a transmitter.
+\section{Accelerometer}
+An RTL block diagram of the Nexys 4 DDR’s on-board accelerometer can be seen in Figure 3.2.
+It has four outputs which are of interest to this project, they are;
+\begin{itemize}
+\item ACCEL\_X – Acceleration in the x-axis
+\item ACCEL\_Y – Acceleration in the y-axis
+\item ACCEL\_Z – Acceleration in the z-axis
+\item ACCEL\_TMP – Temperature read in by the thermometer
+\end{itemize}
+\begin{figure}[ht]
+\centerline{\includegraphics[scale=0.6]{diagrams/image9}}
+\caption{Accelerometer RTL Block Diagram}
+\end{figure}
+
+To connect this RTL module to the MicroBlaze, it must be implemented as an AXI peripheral.
+\section{FFT}
+The below diagram shows the data-flow for an eight-point decimation-in-time radix-2 FFT.
+This is the type of FFT which will be implemented on the MicroBlaze in the C programming language.
+A data flow diagram for this form of FFT can be seen in Figure 3.3.
+\begin{figure}[h]
+\centerline{\includegraphics[scale=0.8]{diagrams/FFT}}
+\caption{Data flow diagram for FFT}
+\end{figure}
+
+The testing of the FFT will be done by entering a sinusoid as stimulus to the design.
+The output of this system will be measured against expected results.
+Wave data will also be obtained to measure against pre-determined results.
+\section{UART}
+The design will have a Xilinx MicroBlaze soft-processor with a Universal Asynchronous Receiver/Transmitter (UART) port which can be used to send out the resultant FFT.
+The UART can be used to send Attention (AT) commands (from the Hayes command set) and drive a Global System for Mobile Communications (GSM) module.
+This type of design has been used in many different applications \cite{Gai13,Jos16}.
+A block diagram of an example design can be seen in Figure 3.4.
+\begin{figure}[h]
+\centerline{\includegraphics[scale=0.8]{diagrams/GSM}}
+\caption{Wireless embedded system built around Artix 7 FPGA}
+\end{figure}
+
+Data will be transmitted using the RS-232 standard for serial communication.
+This interface can be seen in Figure 3.5
+\begin{figure}[h]
+\centerline{\includegraphics[width=1.0\textwidth]{diagrams/RS232}}
+\caption{Interfacing UART and GSM SIM900A Module}
+\end{figure}
+
+\chapter{Implementation}
+This chapter will discuss the technical elements of implementing the proposed systems and issues that occurred in the process.
+\section{Nexys4-DDR Advanced I/O Demo}
+To ensure that all modules and components of the FPGA were functioning correctly, the \textit{Nexys4-DDR Advanced I/O Demo} was the first thing that was loaded onto the FPGA.
+This was done using Vivado Design Suite.
+This demo intends to emulate the functionality of the built-in self-test which usually comes pre-loaded onto the FPGA, however the board being used had been previously flashed.
+
+This demo will demonstrate usage of the ADXL362 Accelerometer and display results using the on-board Video Graphics Array (VGA) display in 1280 x 1024 mode.
+The behaviour of this is as follows.
+The demo connects to the VGA display in a 1280 x 1024 resolution and displays various items on the screen.
+The item of interest here is the small square representing the X and Y acceleration data from the ADXL362 onboard accelerometer. The square moves according the board’s position \cite{demo}.
+
+The accelerometer display also displays the acceleration magnitude.
+This is calculated using the equation below.
+\begin{equation} 
+Accel_{MAG} = \sqrt{x^2 + y^2 + z^2}
+\end{equation}
+where $x$, $y$ and $z$ represent the acceleration value on the respective axes. The demo also shows the accelerometer temperature value.
+
+This demo required some debugging as the version downloaded from GitHub did not work ``out of the box''.
+However, changing default I/O standards on some of the I/O ports allowed the implementation to be run within Vivado.
+The VHDL code for the accelerometer control module can be seen in Appendix B.
+
+To ensure the z-axis was working correctly, the RTL module was modified so that the small square’s position represent acceleration data in the X and Z axes as opposed to X and Y.
+
+\section{MicroBlaze}
+The first prerequisite in getting a MicroBlaze running on the FPGA is installing the board file for the board which will be used (in this case, the Nexys 4 DDR) \cite{mbserver}.
+A board file is essentially an Extensible Markup Language (XML) file contained within the Vivado installation directory.
+It describes the component parts of the board itself and gives each part a respective name and index.
+The specified board can then be selected when starting a new project so that everything is configured correctly.
+
+The Preliminary Report in the Appendices outlines two of the goals as having an FFT in hardware and having a UART on a MicroBlaze.
+These objectives were modified to incorporate the implementation of the FFT on the MicroBlaze also.
+This implementation of the MicroBlaze allows for output from a C program to go out over UART.
+
+The result of implementing the MicroBlaze as above is the block design in Figure 4.1.
+In this design the UART IP block, AXI Uartlite, is connected to the AXI Interconnect.
+However, this implementation does not interface with the accelerometer module.
+
+Once a bitstream is generated for the design, the project can be exported to Xilinx SDK.
+From here, a C program can be written on and UART output can be examined using the \texttt{print()} function.
+This can be seen in Listing 4.1. 
+\begin{lstlisting}[caption={``Hello World'' C program},captionpos=b,language=C,frame=single]
+#include <stdio.h>
+#include "platform.h"
+#include "xil_printf.h"
+int main() {
+    init_platform();
+    print("Hello World\n\r");
+    cleanup_platform();
+    return 0;
+}
+\end{lstlisting}
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=1.0\textheight,angle=90,scale=0.9]{diagrams/microblaze0}}
+\caption{MicroBlaze implementation with UART}
+\end{figure}
+
+\section{AXI Peripheral}
+The next step after creating a project with a MicroBlaze was to have it interact with the accelerometer module.
+This proved to be most difficult task of the project.
+To do this, a custom IP block needed to be created.
+This would be an AXI peripheral containing the RTL accelerometer module, which would then be connected to the AXI Interconnect.
+Tutorials for creating a custom IP block like this using VHDL can be found online \cite{axiperiph}.
+
+The referenced tutorial describes the process of implementing a multiplier in VHDL on a MicroZed board.
+The boards are part of Xilinx’s Zynq product family, as opposed to using soft-processors Zynq boards have both an FPGA fabric and an ARM processor.
+The first steps in this tutorial are common to that of a tutorial from Xilinx for creating an AXI peripheral \cite{xiaxi}.
+
+The VHDL multiplier from \textit{FPGA Developer} was used as a basis to get a working example of a custom AXI peripheral.
+This code can be seen in Appendix C.
+
+As can be seen from Figure 4.3, there is now a second AXI peripheral connected to the AXI Interconnect, \textit{my\_multiplier\_v1.0}.
+This peripheral allows two values to be written to memory from a C program in Xilinx SDK and then multiplies them together and stores the result in another location in memory.
+
+Once this was achieved, a similar procedure was followed to implement the accelerometer module as an AXI peripheral.
+The intention of this peripheral was to store accelerometer magnitude values in memory, these values would then be used as input to the FFT in C.
+Unfortunately, this goal was not achieved as a result of an inability to run the implementation of the design which contained the accelerometer AXI peripheral.
+\begin{figure}[h]
+\centerline{\includegraphics[scale=1]{diagrams/image18}}
+\caption{Block diagram of custom AXI Peripheral}
+\end{figure}
+
+The peripheral in Figure 4.2 can be seen as part of the full system in Figure 4.3.
+This multiplier module was instantiated with the VHDL in Listing 4.2.
+\begin{lstlisting}[caption={Instantiation of custom AXI peripheral},captionpos=b,frame=single]
+multiplier_0 : multiplier  
+port map (  
+  clk => S_AXI_ACLK,  
+  a => slv_reg0(31 downto 16),  
+  b => slv_reg0(15 downto 0),  
+  p => multiplier_out); 
+\end{lstlisting}
+The custom AXI peripheral was then tested from SDK with the code in Listing 4.4.
+\begin{lstlisting}[caption={C program using custom AXI},captionpos=b,language=C,frame=single]
+Xuint32 *baseaddr_p = (Xuint32*)XPAR_MY_MULTIPLIER_0_S00_AXI_BASEADDR;
+int main()
+{
+	init_platform();
+	xil_printf("Multiplier Test\n\r");
+	// Write multiplier inputs to register 0
+	*(baseaddr_p+0) = 0x00020003;
+	xil_printf("Wrote: 0x%08x \n\r", *(baseaddr_p+0));
+	// Read multiplier output from register 1
+	xil_printf("Read : 0x%08x \n\r", *(baseaddr_p+1));
+	xil_printf("End of test\n\n\r");
+	return 0;
+}
+\end{lstlisting}
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=1.0\textheight,angle=90,scale=0.9]{diagrams/microblaze1}}
+\caption{MicroBlaze implementation with UART and custom AXI peripheral}
+\end{figure}
+\newpage
+\section{FFT}
+Although the accelerometer magnitude could not be used as input to the FFT due to the above issue, an FFT could still be implemented on the MicroBlaze in C.
+Instead of using accelerometer measurements from the board, a sample sinusoid would be used as an input to the FFT.
+Sample wave data was acquired from a project which also used accelerometers on a buoy \cite{reddit}.
+This data was imported into MATLAB to produce the plot seen in Figure 4.4.
+\begin{figure}[ht]
+\centerline{\includegraphics[scale=0.6]{diagrams/wave1}}
+\caption{Measured Wave Data}
+\end{figure}
+\begin{figure}[ht]
+\centerline{\includegraphics[scale=0.6]{diagrams/wave2}}
+\caption{FFT of Measured Wave Data}
+\end{figure}
+
+To confirm the frequency of the sample data, an FFT was performed in MATLAB.
+The resultant frequency is what will be used for the sinusoid, in order to replicate real wave data.
+The FFT of the measurements can be seen in Figure 4.5.
+
+The results show that the waves have a frequency of 0.6Hz and an amplitude of 0.05m.
+This was wave approximated in MATLAB with a single sinusoid.
+Plots of the measured data and simple sinusoid can be seen in Figure 4.6.
+\begin{figure}[ht]
+\centerline{\includegraphics[scale=0.6]{diagrams/wave3}}
+\caption{Measured Wave vs. Simple Wave}
+\end{figure}
+
+It was decided to do an eight-point FFT.
+As such, the input to the FFT to be done in C can be seen in Figure 4.7.
+The commented M-file used for the generation and plotting of these sinusoids is shown in Appendix D.
+\begin{figure}[ht]
+\centerline{\includegraphics[scale=0.6]{diagrams/wave4}}
+\caption{8-points of input sinusoid}
+\end{figure}
+
+The input values for the C program were also generated in MATLAB. These include values for the input signal ($x$), the twiddle factors ($tw$), and the correct results ($X$).
+\begin{lstlisting}[caption={Generating FFT input data in MATLAB},captionpos=b,frame=single]
+% Generate input variables for C program
+% x (input signal), tw (twiddle factors)
+t = linspace(0,(1/0.6),8);
+x = 0.05*sin(2*pi*0.6*time);
+X = fft(x);
+for k = 0:3
+    tw(k+1) = (exp(1))^((-j*2*pi*k)/8);
+end
+\end{lstlisting}
+
+The values for $x$ were stored in a structure which contained real and imaginary numbers.
+This is in order to allow both real and imaginary numbers to multiplied by the twiddle factors.
+The structure in which the above MATLAB values are stored is shown in Listing 4.5.
+The output from C program is compared to the theoretical results which are also stored in an array.
+\begin{lstlisting}[caption={Structure in C for complex numbers},captionpos=b,language=C,frame=single]
+//Structure to hold real and imaginary numbers
+struct complex
+{
+    float real, img;
+};
+//Twiddle factors, input data, and expected results
+//(calculated in MATLAB)
+struct complex tw[4] = {{1,0},{0.707,-0.707},{0,-1},{-0.707,-0.707}};
+struct complex data[8] = {{0,0},{0.0391,0},{0.0487,0},{0.0217,0},
+                         {-0.0217,0},{-0.0487,0},{-0.0391,0},{0,0}};
+struct complex gold[8] = {{0.0000,0.0000},{0.0685,-0.1653},
+                         {-0.0313,0.0313},{-0.0251,0.0104},
+                         {-0.0241,0.0000},{-0.0251,-0.0104},
+                         {-0.0313,-0.0313},{0.0685,0.1653}};
+\end{lstlisting}
+
+As previously mentioned, the implementation will be a radix-2 Cooley-Tukey algorithm.
+As the input is eight samples, the amount of radix-2 stages is equal to;
+\begin{equation} 
+\log_2(8) = 3 \text{ stages}
+\end{equation}
+Each stage in the C program will be a function containing the butterfly operations on each of the input samples and the shuffling of the elements in the input array.
+The output of stage one will be the input to the stage two function, stage two's output is also the input the final third stage.
+Mathematically, the butterflies are of the form;
+\begin{equation} 
+y_0 = x_0 + x_1\omega^k_n
+\end{equation}
+\begin{equation} 
+y_1 = x_0 - x_1\omega^k_n
+\end{equation}
+
+In C, this can be written as shown in Listing 4.6.
+\begin{lstlisting}[caption={Example butterfly operations in C},captionpos=b,language=C,frame=single]
+  stage2[5].real = (s1[5].real + s1[7].real)*tw[1].real - (s1[5].img + s1[7].img)*tw[1].img;
+  stage2[5].img = (s1[5].real + s1[7].real)*tw[1].img + (s1[5].img + s1[7].img)*tw[1].real;
+  stage2[6].real = (s1[4].real - s1[6].real)*tw[2].real - (s1[4].img - s1[6].img)*tw[2].img;
+  stage2[6].img  = (s1[4].real - s1[6].real)*tw[2].img + (s1[4].img - s1[6].img)*tw[2].real;
+\end{lstlisting}
+
+The source code for the full C program can be seen in Appendix A.
+A flowchart outlining the functionality of the C program is shown in Figure 4.8.
+\begin{figure}[ht]
+\centerline{\includegraphics[scale=0.8]{diagrams/Presentation1}}
+\caption{Flowchart for C program}
+\end{figure}
+\chapter{Results \& Discussion}
+In this chapter, the results of the implementation will be discussed.
+These results will show the various outputs from the development board.
+\section{Nexys4-DDR Advanced I/O Demo}
+Figure 5.1 shows the VGA output from the Advance I/O Demo.
+There is a separate window shown for each measurement device.
+The accelerometer windows shows a green box move in its respective axis as the board moves.
+The temperature sensor on the accelerometer also shows the boards temperature.
+This demo also shows other peripherals available on the device (e.g. microphone and LED colours).
+From running and debugging this demo, it was confirmed that the sensors that were required throughout the project are working correctly.
+\begin{figure}[ht]
+\centerline{\includegraphics[scale=0.7]{diagrams/image29}}
+\caption{Results of Advanced I/O Demo}
+\end{figure}
+
+Once this functionality was achieved, work began on getting the MicroBlaze working on the FPGA.
+This began with getting a UART AXI peripheral working first, followed by implementing a custom AXI peripheral.
+The results of this are outlined below.
+\section{MicroBlaze}
+The string ``Hello World'' was sent from the MicroBlaze.
+This was monitored and tested using Tera Term on a personal computer.
+The output from the UART was sent out via USB to Communication port 4 (COM4).
+Figure 5.2 shows the screenshot of Tera Term displaying the message sent from the UART.
+\begin{figure}[ht]
+\centerline{\includegraphics[scale=0.9]{diagrams/image30}}
+\caption{``Hello World'' from MicroBlaze UART shown on terminal}
+\end{figure}
+\section{AXI Peripheral}
+Figure 5.3 shows the AXI peripheral functioning correctly.
+The value 0x00090009 is written.
+The module then separates this into two separate values.
+The first product, $a$, is equal to bits 31 down to 16.  The second product, $b$, is equal to bits 15 down to 0.
+The result, $p$, is in hexadecimal.
+\begin{equation} 
+a \times b = p
+\end{equation}
+\begin{equation} 
+9_{16} \times 9_{16} = 51_{16}
+\end{equation}
+\begin{figure}[ht]
+\centerline{\includegraphics[scale=1]{diagrams/image31}}
+\caption{Custom AXI output shown on terminal}
+\end{figure}
+\section{FFT}
+Figure 5.4 shows the input, output, and expected results of the FFT.
+The output values match the expected ones calculated by MATLAB.
+The absolute values of these results represent the magnitude spectrum of the wave data.
+\begin{figure}[ht]
+\centerline{\includegraphics[scale=0.7]{diagrams/image32}}
+\caption{FFT Output from compiled source}
+\end{figure}
+
+These results were plotted in MATLAB to show the accuracy of the results.
+It can be seen from Figure 5.6 that the wave period is calculated as 0.6Hz and the amplitude is calculated as 0.0447 metres. This frequency  is correct but the amplitude is off by roughly 10\%.
+\begin{figure}[ht]
+\centerline{\includegraphics[scale=0.5]{diagrams/wave5}}
+\caption{Plot of FFT Results}
+\end{figure}
+\chapter{Conclusion}
+The core purpose of this project was to demonstrate how FPGA technology can be used to analyse waves.
+This was achieved by implementing a softcore MicroBlaze processor on the FPGA which allowed an FFT to be written in C on the device.
+The FFT was performed on sample accelerometer measurements using the radix-2 DIT form of the Cooley-Tukey algorithm.
+This result was then verified against theoretical results using MATLAB.
+The accelerometer on the development board was tested along with the temperature sensor.
+An AXI peripheral was designed to show how the accelerometer could interface with the MicroBlaze processor.
+The MicroBlaze had a UART interface which allowed for the results to be sent from the C program over USB.
+In doing this, many skills were developed.
+This includes learning how to use some new IDEs as well as getting exposure to HDL.
+\section{Future Work}
+Although many of the objectives were met, further development can be done in this area to improve performance. The below roadmap shows how this may be done.
+\begin{itemize}
+\item A more accurate FFT could be used to improve the results, this would involve changing the C code to support a higher amount of points.
+(E.g. increase from 8-points to 32-point or 64-point).
+This would allow acceleration measurements to be acquired over a longer period and thus provide more accurate information on sea state.
+\item Integrate GSM onto the FPGA.
+As the FPGA already outputs via UART, it would be possible to integrate a GSM module with a SIM card to the board.
+This would provide the functionality of sending an SMS with calculated information to a mobile device or third-party service, like Twitter.
+\item Waterproofing and providing external power to the device would allow for it to be put out on marine buoys.
+\item If this design was used on many devices, it would be cost effective to implement it on an application-specific integrated circuit (ASIC) as opposed to an FPGA.
+\end{itemize}
+%-----------------------------------------------------------------
+%	REFERENCES
+%-----------------------------------------------------------------
+\bibliography{references.bib}
+\addcontentsline{toc}{chapter}{References}
+%-----------------------------------------------------------------
+%	APPENDICES
+%----------------------------------------------------------------
+\begin{appendices}
+\makeatletter
+\def\toclevel@chapter{1}\def\toclevel@section{2}
+\addtocontents{toc}{\string\let\string\l@chapter\string\l@section}
+\makeatother
+\chapter{C Source Code}
+\begin{lstlisting}[captionpos=b,language=C,frame=single]
+//Structure to hold real and imaginary numbers
+struct complex
+{
+    float real, img;
+};
+
+//Twiddle factors, input data, and expected results (calculated in MATLAB)
+struct complex tw[4] = {{1,0},{0.707,-0.707},{0,-1},{-0.707,-0.707}};
+struct complex data[8] = {{0,0},{0.0391,0},{0.0487,0},{0.0217,0},
+                         {-0.0217,0},{-0.0487,0},{-0.0391,0},{0,0}};
+struct complex gold[8] = {{0.0000,0.0000},{0.0685,-0.1653},
+                         {-0.0313,0.0313},{-0.0251,0.0104},
+                         {-0.0241,0.0000},{-0.0251,-0.0104},
+                         {-0.0313,-0.0313},{0.0685,0.1653}};
+
+//Output structure for stage 1
+struct complex stage1[8];
+
+//First stage of butterfly operations
+void stage1FFT(struct complex x[8]) {
+  printf("FFT INPUT\n");
+  int i;
+  for (i= 0; i < 8; i++){
+    printf("x(%d) = (%.5f %.5fi)\n",i, x[i].real, x[i].img);
+  }
+  stage1[0].real = x[0].real + x[4].real;
+  stage1[1].real = x[0].real - x[4].real;
+  stage1[2].real = x[2].real + x[6].real; //by tw0 (1 + 0j)
+  stage1[3].real = (x[2].real - x[6].real)*tw[2].real; //by tw2 (0 - 1j)
+  stage1[3].img = (x[2].real - x[6].real)*tw[2].img; //by tw2 (0 - 1j)
+  stage1[4].real = x[1].real + x[5].real;
+  stage1[5].real = x[1].real - x[5].real;
+  stage1[6].real = x[3].real + x[7].real; //by tw0
+  stage1[7].real = (x[3].real - x[7].real)*tw[2].real; //by tw2
+  stage1[7].img = (x[3].real - x[7].real)*tw[2].img; //by tw2
+}
+
+// Output structure for stage 2
+struct complex stage2[8];
+
+// Second stage of butterflies
+void stage2FFT(struct complex s1[8]) {
+  stage2[0].real = s1[0].real + s1[2].real;
+  stage2[1].real = s1[1].real + s1[3].real;
+  stage2[1].img = s1[1].img + s1[3].img;
+  stage2[2].real = s1[0].real - s1[2].real;
+  stage2[3].real = s1[1].real - s1[3].real;
+  stage2[3].img = s1[1].img - s1[3].img;
+  stage2[4].real = s1[4].real + s1[6].real;
+  stage2[5].real = (s1[5].real + s1[7].real)*tw[1].real - (s1[5].img + s1[7].img)*tw[1].img;
+  stage2[5].img = (s1[5].real + s1[7].real)*tw[1].img + (s1[5].img + s1[7].img)*tw[1].real;
+  stage2[6].real = (s1[4].real - s1[6].real)*tw[2].real - (s1[4].img - s1[6].img)*tw[2].img;
+  stage2[6].img  = (s1[4].real - s1[6].real)*tw[2].img + (s1[4].img - s1[6].img)*tw[2].real;
+  stage2[7].real = (s1[5].real - s1[7].real)*tw[3].real - (s1[5].img - s1[7].img)*tw[3].img;
+  stage2[7].img = (s1[5].real - s1[7].real)*tw[3].img + (s1[5].img - s1[7].img)*tw[3].real;
+}
+
+// Output structure for stage 3
+struct complex stage3[8];
+
+// Final stage of butterflies
+void stage3FFT(struct complex s2[8]) {
+  int j;
+  for (j = 0; j < 4; j++) {
+    stage3[j].real = s2[j].real + s2[j+4].real;
+    stage3[j].img = s2[j].img + s2[j+4].img;
+  }
+  int k;
+  for (k=4; k < 8; k++) {
+    stage3[k].real = s2[k-4].real - s2[k].real;
+    stage3[k].img = s2[k-4].img - s2[k].img;
+  }
+}
+
+// Run all 3 stages of butterflies and print calculated results beside expected results
+int main () {
+  stage1FFT(data);
+  stage2FFT(stage1);
+  stage3FFT(stage2);
+  int i;
+  printf("FFT OUTPUT\n");
+  for (i= 0; i < 8; i++){
+   printf("Calculated Result:\tX(%d) = (%.3f %.3fi)\nExpected Result:\tX(%d) = (%.3f %.3fi)\n",i, stage3[i].real, stage3[i].img,i,gold[i].real,gold[i].img);
+  }
+}
+\end{lstlisting}
+\chapter{VHDL Accelerometer Code}
+\begin{lstlisting}[captionpos=b,frame=single]
+----------------------------------------------
+----------------------------------------------
+-- Author:  Albert Fazakas
+--          Copyright 2014 Digilent, Inc.
+----------------------------------------------
+-- 
+-- Create Date:    15:00:45 03/04/2014 
+-- Design Name: 
+-- Module Name:    AccelerometerCtl - Behavioral 
+-- Project Name: 
+-- Target Devices: 
+-- Tool versions: 
+-- Description: 
+--       This is the main module for the the Nexys4 onboard ADXL362 accelerometer.
+--    The module consists of two components, AXDX362Ctrl and AccelArithmetics. The first one
+--    configures the ADXL362 accelerometer and continuously reads X, Y, Z acceleration data and
+--    temperature data in 12-bit two's complement format. 
+--       The data read is sent to the AccelArithmetics module that formats X and Y acceleration 
+--    data to be displayed on the VGA screen in a 512 X 512 pixel area. Therefore the X and Y 
+--    acceleration data will be scaled and limited to -1g: 0, 0g: 255, 1g: 511.
+--       The AccelArithmetics module also determines the acceleration  magnitude using the
+--    SQRT (X^2 + Y^2 + Z^2) formula. The magnitude value is also displayed on the VGA screen.
+--    To perform SQRT calculation a Logicore component is used.
+--
+-- Revision: 
+-- Revision 0.01 - File Created
+-- Additional Comments: 
+--
+----------------------------------------------
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+-- Uncomment the following library declaration if using
+-- arithmetic functions with Signed or Unsigned values
+--use IEEE.NUMERIC_STD.ALL;
+
+-- Uncomment the following library declaration if instantiating
+-- any Xilinx primitives in this code.
+--library UNISIM;
+--use UNISIM.VComponents.all;
+
+entity AccelerometerCtl is
+generic 
+(
+   SYSCLK_FREQUENCY_HZ : integer := 100000000;
+   SCLK_FREQUENCY_HZ   : integer := 1000000;
+   NUM_READS_AVG       : integer := 16;
+   UPDATE_FREQUENCY_HZ : integer := 100
+);
+port
+(
+ SYSCLK     : in STD_LOGIC; -- System Clock
+ RESET      : in STD_LOGIC;
+
+ -- Spi interface Signals
+ SCLK       : out STD_LOGIC;
+ MOSI       : out STD_LOGIC;
+ MISO       : in STD_LOGIC;
+ SS         : out STD_LOGIC;
+
+-- Accelerometer data signals
+ ACCEL_X_OUT    : out STD_LOGIC_VECTOR (8 downto 0);
+ ACCEL_Y_OUT    : out STD_LOGIC_VECTOR (8 downto 0);
+ ACCEL_MAG_OUT  : out STD_LOGIC_VECTOR (11 downto 0);
+ ACCEL_TMP_OUT  : out STD_LOGIC_VECTOR (11 downto 0)
+
+);
+end AccelerometerCtl;
+
+architecture Behavioral of AccelerometerCtl is
+
+component ADXL362Ctrl
+generic 
+(
+   SYSCLK_FREQUENCY_HZ : integer := 100000000;
+   SCLK_FREQUENCY_HZ   : integer := 1000000;
+   NUM_READS_AVG       : integer := 16;
+   UPDATE_FREQUENCY_HZ : integer := 1000
+);
+port
+(
+ SYSCLK     : in STD_LOGIC; -- System Clock
+ RESET      : in STD_LOGIC;
+ 
+ -- Accelerometer data signals
+ ACCEL_X    : out STD_LOGIC_VECTOR (11 downto 0);
+ ACCEL_Y    : out STD_LOGIC_VECTOR (11 downto 0);
+ ACCEL_Z    : out STD_LOGIC_VECTOR (11 downto 0);
+ ACCEL_TMP  : out STD_LOGIC_VECTOR (11 downto 0);
+ Data_Ready : out STD_LOGIC;
+ 
+ --SPI Interface Signals
+ SCLK       : out STD_LOGIC;
+ MOSI       : out STD_LOGIC;
+ MISO       : in STD_LOGIC;
+ SS         : out STD_LOGIC
+
+);
+end component;
+
+component AccelArithmetics
+generic
+(
+   SYSCLK_FREQUENCY_HZ : integer := 100000000;
+   ACC_X_Y_MAX         : STD_LOGIC_VECTOR (9 downto 0) := "01" & X"FF"; -- 511 pixels, corresponding to +1g
+   ACC_X_Y_MIN         : STD_LOGIC_VECTOR (9 downto 0) := (others => '0') -- corresponding to -1g
+);
+port
+(
+ SYSCLK     : in STD_LOGIC; -- System Clock
+ RESET      : in STD_LOGIC;
+ 
+ -- Accelerometer data input signals
+ ACCEL_X_IN    : in STD_LOGIC_VECTOR (11 downto 0);
+ ACCEL_Y_IN    : in STD_LOGIC_VECTOR (11 downto 0);
+ ACCEL_Z_IN    : in STD_LOGIC_VECTOR (11 downto 0);
+ Data_Ready    : in STD_LOGIC;
+
+ -- Accelerometer data output signals to be sent to the VGA controller
+ 
+ ACCEL_X_OUT    : out STD_LOGIC_VECTOR (8 downto 0);
+ ACCEL_Y_OUT    : out STD_LOGIC_VECTOR (8 downto 0);
+ ACCEL_MAG_OUT  : out STD_LOGIC_VECTOR (11 downto 0)
+);
+end component;
+
+-- Self-blocking reset counter constants
+constant ACC_RESET_PERIOD_US : integer := 10;
+constant ACC_RESET_IDLE_CLOCKS   : integer := ((ACC_RESET_PERIOD_US*1000)/(1000000000/SYSCLK_FREQUENCY_HZ));
+
+signal  ACCEL_X    : STD_LOGIC_VECTOR (11 downto 0);
+signal  ACCEL_Y    : STD_LOGIC_VECTOR (11 downto 0);
+signal  ACCEL_Z    : STD_LOGIC_VECTOR (11 downto 0);
+
+signal Data_Ready : STD_LOGIC;
+
+-- Self-blocking reset counter
+signal cnt_acc_reset : integer range 0 to (ACC_RESET_IDLE_CLOCKS - 1):= 0;
+signal RESET_INT: std_logic;
+
+
+begin
+
+
+-- Create the self-blocking reset counter
+COUNT_RESET: process(SYSCLK, cnt_acc_reset, RESET)
+begin
+   if SYSCLK'EVENT and SYSCLK = '1' then
+      if (RESET = '1') then
+         cnt_acc_reset <= 0;
+         RESET_INT <= '1';
+      elsif cnt_acc_reset = (ACC_RESET_IDLE_CLOCKS - 1) then
+         cnt_acc_reset <= (ACC_RESET_IDLE_CLOCKS - 1);
+         RESET_INT <= '0';
+      else
+         cnt_acc_reset <= cnt_acc_reset + 1;
+         RESET_INT <= '1';
+      end if;
+   end if;
+end process COUNT_RESET;
+
+
+ADXL_Control: ADXL362Ctrl
+generic map
+(
+   SYSCLK_FREQUENCY_HZ  => SYSCLK_FREQUENCY_HZ,
+   SCLK_FREQUENCY_HZ    => SCLK_FREQUENCY_HZ,
+   NUM_READS_AVG        => NUM_READS_AVG,   
+   UPDATE_FREQUENCY_HZ  => UPDATE_FREQUENCY_HZ
+)
+port map
+(
+ SYSCLK     => SYSCLK, 
+ RESET      => RESET_INT, 
+ 
+ -- Accelerometer data signals
+ ACCEL_X    => ACCEL_X,
+ ACCEL_Y    => ACCEL_Y, 
+ ACCEL_Z    => ACCEL_Z,
+ ACCEL_TMP  => ACCEL_TMP_OUT, 
+ Data_Ready => Data_Ready, 
+ 
+ --SPI Interface Signals
+ SCLK       => SCLK, 
+ MOSI       => MOSI,
+ MISO       => MISO, 
+ SS         => SS
+);
+
+Accel_Calculation: AccelArithmetics
+GENERIC MAP
+(
+   SYSCLK_FREQUENCY_HZ  => 100000000,
+   ACC_X_Y_MAX          => "01" & X"FF", -- 511 pixels, corresponding to +1g
+   ACC_X_Y_MIN          => (others => '0') -- corresponding to -1g
+)
+PORT MAP
+(
+ SYSCLK  => SYSCLK, 
+ RESET   => RESET_INT,
+ 
+ -- Accelerometer data input signals
+ ACCEL_X_IN => ACCEL_X,
+ ACCEL_Y_IN => ACCEL_Y,
+ ACCEL_Z_IN => ACCEL_Z,
+ Data_Ready => Data_Ready,
+
+ -- Accelerometer data output signals to be sent to the VGA display
+ ACCEL_X_OUT => ACCEL_X_OUT,
+ ACCEL_Y_OUT => ACCEL_Y_OUT,
+ ACCEL_MAG_OUT => ACCEL_MAG_OUT
+);
+
+end Behavioral;
+\end{lstlisting}
+\chapter{VHDL AXI Peripheral Code}
+\begin{lstlisting}[captionpos=b,frame=single]
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.std_logic_arith.all;
+use ieee.std_logic_unsigned.all;
+
+entity multiplier is
+  port(
+    clk : in std_logic;
+    a   : in std_logic_vector(15 downto 0);
+    b   : in std_logic_vector(15 downto 0);
+    p   : out std_logic_vector(31 downto 0)
+  );
+end multiplier;
+
+architecture IMP of multiplier is
+  
+begin
+  process (clk)
+  begin
+    if clk'event and clk = '1' then
+      p <= a * b;
+    end if;
+  end process;
+end IMP;
+\end{lstlisting}
+\chapter{Sinusoids M-file}
+\begin{lstlisting}[captionpos=b,frame=single]
+% Load in accelerometer data and timestamps from spreadsheet
+% Plot in the time domain
+signal = load('data.txt');
+time = load('time.txt');
+time = time - time(1);
+figure
+plot(time,signal,'DisplayName','Measured Wave Data')
+ylabel('Distance (metres)')
+xlabel('Time (seconds)')
+title('Wave Data')
+legend('show')
+axis tight
+% Single-sided magnitude spectrum with frequency axis in Hertz
+% Each bin frequency is separated by fs/N Hertz.
+figure
+N = length(signal);
+fs = 10;
+fnyquist = fs/2;
+f = (0:fs/N:round(fs/2));
+X_mags = abs(fft(signal));
+bin_vals = [0 : N-1];
+fax_Hz = bin_vals*fs/N;
+N_2 = ceil(N/2);
+plot(fax_Hz(1:N_2), X_mags(1:N_2)/length(signal))
+xlabel('Frequency (Hz)')
+ylabel('Magnitude');
+title('Single-sided Magnitude spectrum (Hertz)');
+axis tight
+% Plot measured data with a simple sinsusoid of the same frequency
+% and same amplitude plotted against it.
+figure
+plot(time,signal,'DisplayName','Measured Wave Data')
+hold on
+mysine = 0.05*cos(2*pi*0.6*time);
+plot(time,mysine,'r','DisplayName','Simple Sinusoid')
+ylabel('Distance (metres)')
+xlabel('Time (seconds)')
+title('Wave Data')
+legend('show')
+axis tight
+% Plot simple sinusoid with 8-samples marked out on plot
+figure
+time = linspace(0,(1/0.6),100);
+mysine = 0.05*sin(2*pi*0.6*time);
+plot(time,mysine,'DisplayName','Input Data');
+time = linspace(0,(1/0.6),8);
+mysine = 0.05*sin(2*pi*0.6*time);
+hold on
+plot(time,mysine,'ro','DisplayName','8 points')
+axis tight
+ylabel('Distance (metres)')
+xlabel('Time (seconds)')
+title('Wave Data')
+legend('show')
+\end{lstlisting}
+\chapter{Preliminary Report}
+\begin{figure}[h]
+\centerline{\includegraphics[page=1,scale=0.55]{diagrams/Prelim.pdf}}
+\end{figure}
+\centerline{\includegraphics[page=2,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=3,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=4,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=5,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=6,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=7,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=8,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=9,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=10,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=11,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=12,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=13,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=14,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=15,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=16,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=17,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\centerline{\includegraphics[page=18,width=1.0\textwidth]{diagrams/Prelim.pdf}}
+\end{appendices}
+\end{document}
